@@ -86,7 +86,7 @@
                                             <option value="put">Put (P)</option>
                                         </select>
                                         <label class="form-label mb-2">Edit Number of Contracts</label>
-                                        <input type="text" class="form-control" v-model="target.numContracts"
+                                        <input type="text" class="form-control mb2" v-model="target.numContracts"
                                             inputmode="numeric" pattern="[0-9]*"
                                             @input="sanitizeIntegerInput('targetPrices[' + index + '].numContracts')"
                                             @keypress="preventNonNumeric" />
