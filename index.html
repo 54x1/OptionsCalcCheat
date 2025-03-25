@@ -2,256 +2,651 @@
 <html>
 
 <head>
-    <title>Options Profit Forecaster</title>
+    <title>Advanced Options Calculator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        .shadow-right-bottom {
+            box-shadow: 4px 4px 5px rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+        }
+
+        .cursor-pointer {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .cursor-pointer:hover {
+            background-color: #f8f9fa;
+        }
+
+        .profit-positive {
+            color: #198754;
+            font-weight: bold;
+        }
+
+        .profit-negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .calculation-details {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+    </style>
 </head>
 
 <body>
     <div id="app" class="container mt-5">
-        <h2 class="mb-4">Options Profit/Loss Calculator</h2>
+        <h2 class="mb-4">Advanced Options Profit/Loss Calculator</h2>
 
-        <!-- Input Section -->
         <div class="row mb-4">
+            <!-- Input Section -->
             <div class="col-md-6 mb-3">
-                <div class="card shadow-right-bottom">
+                <div class="card shadow-right-bottom h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Forecast Price</h5>
-                        <div class="input-group mb-3">
-                            <input type="number" step="0.01" class="form-control" v-model.number="newTargetPrice"
-                                placeholder="Enter forecast price">
-                            <button class="btn btn-primary" @click="addTargetPrice">Add Target</button>
-                        </div>
-                        <h5 class="card-title">Trade Parameters</h5>
-                        <div class="mb-3">
-                            <label class="form-label">Option Type</label>
-                            <select class="form-control" v-model="optionType">
-                                <option value="call">Call (C)</option>
-                                <option value="put">Put (P)</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Number of Contracts</label>
-                            <input type="text" class="form-control" v-model="numContracts" inputmode="numeric"
-                                pattern="[0-9]*" @input="sanitizeIntegerInput('numContracts')"
-                                @keypress="preventNonNumeric" />
+                        <h5 class="card-title mb-4"><i class="bi bi-input-cursor-text"></i> Trade Parameters</h5>
 
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Premium per Contract</label>
-                            <input type="number" step="0.01" class="form-control" v-model.number="premium" @input="validatePremiumInput"
-                            @keypress="preventNegativeInput">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Total Brokerage Fees</label>
-                            <input type="number" step="0.01" class="form-control" v-model.number="brokerage">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Strike Price</label>
-                            <input type="number" step="0.01" class="form-control" v-model.number="strikePrice">
-                        </div>
-
-                    </div>
-                </div>
-
-            </div>
-            <div class="col-md-6 mb-3">
-                <div class="card shadow-right-bottom">
-                    <div class="card-body">
-                        <h5 class="card-title">Forecast</h5>
-                        <ul class="list-group">
-                            <li class="list-group-item" v-for="(target, index) in targetPrices" :key="target.id">
-                                <div @click="toggleDetails(index)"
-                                    class="d-flex justify-content-between btn btn-sm px-0 py-0 align-items-center ">
-                                    <span><strong>Strike Price:</strong> ${{ target.strikePrice }} | <strong>Forecasted Price:</strong> ${{ target.price }} |
-                                        <strong>~P/L:</strong> ${{ target.profit.toFixed(2) }} -
-                                        <strong>Type:</strong> {{ target.optionType === 'call' ? 'C' : 'P' }}</span>
-                                    <button class="btn btn-sm btn-danger" @click.stop="removeTarget(index)">X</button>
-                                </div>
-                                <div class="w-100">
-                                    <button class="btn btn-sm btn-secondary" @click.stop="toggleEdit(index)">
-                                        <span v-if="!target.isEditing">Edit</span>
-                                        <span v-else>Save</span>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Option Type</label>
+                                <div class="btn-group w-100">
+                                    <button v-for="type in optionTypes" :key="type.value"
+                                        @click="optionType = type.value" class="btn btn-outline-primary"
+                                        :class="{ 'active': optionType === type.value }">
+                                        {{ type.label }}
                                     </button>
-                                    <div v-if="target.isEditing" class="mt-2">
-                                        <label class="form-label">Edit Forecast Price</label>
-                                        <input type="number" class="form-control mb-2" v-model.number="target.price"
-                                            @input="updateTarget(index)">
-                                        <label class="form-label">Edit Option Type</label>
-                                        <select class="form-control mb-2" v-model="target.optionType"
-                                            @change="updateTarget(index)">
-                                            <option value="call">Call (C)</option>
-                                            <option value="put">Put (P)</option>
-                                        </select>
-                                        <label class="form-label mb-2">Edit Number of Contracts</label>
-                                        <input type="text" class="form-control mb2" v-model="target.numContracts"
-                                            inputmode="numeric" pattern="[0-9]*"
-                                            @input="sanitizeIntegerInput('targetPrices[' + index + '].numContracts')"
-                                            @keypress="preventNonNumeric" />
-                                        <label class="form-label">Edit Premium per Contract</label>
-                                        <input type="number" step="1" class="form-control mb-2"
-                                            v-model.number="target.premium" @input="validatePremiumInput"
-                                            @keypress="preventNegativeInput">
-                                        <label class="form-label">Edit Total Brokerage Fees</label>
-                                        <input type="number" step="0.01" class="form-control mb-2"
-                                            v-model.number="target.brokerage" @input="updateTarget(index)">
-                                        <label class="form-label">Edit Strike Price</label>
-                                        <input type="number" step="0.01" class="form-control mb-2"
-                                            v-model.number="target.strikePrice" @input="updateTarget(index)">
-                                    </div>
-                                    <div v-if="target.showDetails" class="mt-2 border-top pt-2">
-                                        <p><strong>Forecasted Break-even Price:</strong> ${{ target.breakevenPrice.toFixed(3) }}</p>
-                                        <p><strong>Projected Profit:</strong> ${{ target.profit.toFixed(2) }}</p>
-                                        <p> <strong>Suggested Premium Price:</strong>
-                                            <template v-if="target.optionType === 'call'">
-                                                <span v-if="((target.price - target.strikePrice) - (target.brokerage / (target.numContracts * 100))) > 0">
-                                                    Less than ${{ ((target.price - target.strikePrice) - (target.brokerage / (target.numContracts * 100))).toFixed(2) }}
-                                                </span>
-                                                <span v-else>
-                                                    Trade results in a loss
-                                                </span>
-                                            </template>
-                                            <template v-else>
-                                                <span v-if="((target.strikePrice - target.price) - (target.brokerage / (target.numContracts * 100))) > 0">
-                                                    Less than ${{ ((target.strikePrice - target.price) - (target.brokerage / (target.numContracts * 100))).toFixed(2) }}
-                                                </span>
-                                                <span v-else>
-                                                    Trade results in a loss
-                                                </span>
-                                            </template>
-                                            </p>
-                                        <p><strong>Calculation Details:</strong></p>
-                                        <ul>
-                                            <li><strong>Total Premium:</strong> ({{ target.numContracts }} * 100 * {{ target.premium }}) + {{ target.brokerage.toFixed(2) }} = ${{ target.totalCost.toFixed(2) }}</li>
-                                            <li><strong>Intrinsic Value:</strong> {{ target.optionType === 'call' ? '(Forecast Price - Strike Price)' : '(Strike Price - Forecast Price)' }} = {{ target.intrinsicValue.toFixed(3) }}</li>
-                                            <li><strong>Profit Formula:</strong> ({{ target.intrinsicValue.toFixed(2) }} * {{ target.numContracts }} * 100) - {{ target.totalCost.toFixed(2) }} = ${{ target.profit.toFixed(2) }}</li>
-                                            <li><strong>Break-even Formula:</strong> {{ target.optionType === 'call' ? 'Strike Price + (Total Cost / Contracts x 100)' : 'Strike Price - (TotalCost / Contracts x 100)' }} = ${{ target.breakevenPrice.toFixed(3) }}</li>
-                                        </ul>
-                                    </div>
                                 </div>
-                            </li>
-                        </ul>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Transaction Type</label>
+                                <template v-if="scenario === 'close'">
+                                    <select class="form-select" v-model="transactionType">
+                                        <option v-for="tran in transactionTypes" :value="tran.value">{{ tran.label }}
+                                        </option>
+                                    </select>
+                                </template>
+                                <template v-else>
+                                    <input class="form-control" type="text" :value="transactionType.toUpperCase()"
+                                        disabled />
+                                    <small class="text-muted">Not used for this scenario</small>
+                                </template>
+                            </div>
+
+
+                            <div class="col-md-6">
+                                <label class="form-label">Scenario</label>
+                                <select class="form-select" v-model="scenario">
+                                    <option v-for="scen in scenarios" :value="scen.value" :key="scen.value">
+                                        {{ scen.label }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Updated Forecast Inputs -->
+                            <div class="col-md-6">
+                                <label class="form-label">Forecast Share Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control"
+                                        v-model.number="forecastSharePrice" placeholder="Underlying share price">
+                                </div>
+                            </div>
+                            <div class="col-md-6" v-if="scenario === 'close'">
+                                <label class="form-label">Forecast Premium</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control"
+                                        v-model.number="newTargetPrice" placeholder="Closing premium">
+                                </div>
+                            </div>
+
+
+
+                            <div class="col-md-6">
+                                <label class="form-label">Number of Contracts</label>
+                                <input type="text" class="form-control" v-model="numContracts"
+                                    @input="sanitizeIntegerInput('numContracts')" @keypress="preventNonNumeric">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Strike Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" v-model.number="strikePrice">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Premium</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" v-model.number="premium"
+                                        @input="validatePremium">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Brokerage Fees</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" v-model.number="brokerage">
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <button class="btn btn-primary w-100" @click="addTargetPrice">
+                                    <i class="bi bi-plus-circle"></i> Add Scenario
+                                </button>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
             </div>
+            <!-- Results Section -->
+            <div class="col-md-6 mb-3">
+                <div class="card shadow-right-bottom h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4"><i class="bi bi-graph-up"></i> Projections</h5>
 
+                        <div v-if="targetPrices.length === 0" class="text-center text-muted py-4">
+                            <i class="bi bi-clipboard-x fs-1"></i>
+                            <p class="mt-2">No scenarios added yet</p>
+                        </div>
+
+                        <div class="accordion" id="resultsAccordion">
+                            <div class="accordion-item" v-for="(target, index) in targetPrices" :key="target.id">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed cursor-pointer" type="button"
+                                        @click="toggleDetails(index)"
+                                        :class="{ 'profit-positive': target.profit >= 0, 'profit-negative': target.profit < 0 }">
+                                        <div class="w-100 pe-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <span class="badge bg-primary me-2">
+                                                        {{ target.transactionType.toUpperCase() }}
+                                                    </span>
+                                                    <span class="badge" :class="optionTypeClass(target)">
+                                                        {{ target.optionType.toUpperCase() }} ${{ target.strikePrice }}
+                                                    </span>
+                                                </div>
+                                                <span class="h5 mb-0">
+                                                    ${{ Math.abs(target.profit).toFixed(2) }}
+                                                    <i class="bi"
+                                                        :class="target.profit >= 0 ? 'bi-arrow-up-right' : 'bi-arrow-down-right'">
+                                                    </i>
+                                                </span>
+                                            </div>
+                                            <div class="text-start small mt-1">
+                                                {{ scenarioDetails(target) }}
+                                            </div>
+                                        </div>
+                                    </button>
+                                </h2>
+
+                                <div :id="'collapse' + index" class="accordion-collapse collapse"
+                                    :class="{ 'show': target.showDetails }">
+                                    <div class="accordion-body">
+                                        <div class="row g-3">
+                                            <!-- Key Metrics -->
+                                            <div class="col-md-6">
+                                                <h6><i class="bi bi-speedometer2 me-2"></i>Key Metrics</h6>
+                                                <ul class="list-unstyled">
+                                                    <li class="d-flex justify-content-between">
+                                                        <span>Break-even:</span>
+                                                        <span>${{ target.breakeven.toFixed(2) }}</span>
+                                                    </li>
+                                                    <li class="d-flex justify-content-between">
+                                                        <span>Suggested Premium:</span>
+                                                        <span>
+                                                            ${{ (target.scenario === 'exercise'
+                                                            ? Math.abs(target.strikePrice - target.forecastSharePrice)
+                                                            : 0).toFixed(2) }}
+                                                        </span>
+
+                                                    </li>
+                                                    <li class="d-flex justify-content-between">
+                                                        <span>Intrinsic Value:</span>
+                                                        <span>${{ target.intrinsicValue.toFixed(2) }}</span>
+                                                    </li>
+                                                    <li class="d-flex justify-content-between">
+                                                        <span>Time Value:</span>
+                                                        <span>${{ (target.premium - target.intrinsicValue).toFixed(2)
+                                                            }}</span>
+                                                    </li>
+
+
+                                                </ul>
+                                            </div>
+
+                                            <!-- Transaction Costs -->
+                                            <div class="col-md-6">
+                                                <h6><i class="bi bi-cash-stack me-2"></i>Costs</h6>
+                                                <ul class="list-unstyled">
+                                                    <li class="d-flex justify-content-between">
+                                                        <span>Premium {{ target.transactionType === 'buy' ? 'Paid' :
+                                                            'Received' }}:</span>
+                                                        <span>${{ (target.numContracts * 100 *
+                                                            target.premium).toFixed(2) }}</span>
+                                                    </li>
+                                                    <li class="d-flex justify-content-between">
+                                                        <span>Total Fees:</span>
+                                                        <span>${{ target.brokerage.toFixed(2) }}</span>
+                                                    </li>
+                                                    <li class="d-flex justify-content-between fw-bold">
+                                                        <span>Net {{ target.transactionType === 'buy' ? 'Cost' :
+                                                            'Credit' }}:</span>
+                                                        <span>${{ target.transactionType === 'buy' ?
+                                                            target.totalCost.toFixed(2) : target.totalCredit.toFixed(2)
+                                                            }}</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+
+                                            <!-- Calculation Details -->
+                                            <div class="col-12">
+                                                <div class="calculation-details">
+                                                    <h6><i class="bi bi-calculator me-2"></i>Calculation</h6>
+                                                    <p class="mb-1" v-html="profitFormula(target)"></p>
+                                                    <p class="mb-0 text-muted small">{{ expirationStatus(target) }}</p>
+                                                </div>
+                                            </div>
+
+                                            <!-- Action Buttons -->
+                                            <div class="col-12">
+                                                <div class="d-flex justify-content-end gap-2">
+                                                    <button class="btn btn-sm btn-outline-secondary"
+                                                        @click.stop="toggleEdit(index)">
+                                                        <i class="bi bi-pencil"></i> Edit
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                        @click.stop="removeTarget(index)">
+                                                        <i class="bi bi-trash"></i> Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <!-- Editable Fields When in Edit Mode -->
+                                            <div v-if="target.isEditing" class="mt-4">
+                                                <div class="row g-2">
+
+                                                    <!-- Forecast Input -->
+
+                                                    <div class="col-md-6" v-if="target.scenario !== 'close'">
+                                                        <label>Forecast Share Price</label>
+                                                        <input class="form-control" type="number" step="0.01"
+                                                            v-model.number="target.forecastSharePrice"
+                                                            @input="liveUpdate(index)" />
+                                                    </div>
+
+                                                    <div class="col-md-6" v-if="target.scenario === 'close'">
+                                                        <label>Forecast Premium</label>
+                                                        <input class="form-control" type="number" step="0.01"
+                                                            v-model.number="target.price" @input="liveUpdate(index)" />
+                                                    </div>
+
+
+
+
+                                                    <div class="col-md-6">
+                                                        <label>Strike Price</label>
+                                                        <input class="form-control" type="number" step="0.01"
+                                                            v-model.number="target.strikePrice" />
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <label>Premium</label>
+                                                        <input class="form-control" type="number" step="0.01"
+                                                            v-model.number="target.premium" />
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <label>Contracts</label>
+                                                        <input class="form-control" type="number"
+                                                            v-model.number="target.numContracts" />
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <label>Brokerage</label>
+                                                        <input class="form-control" type="number" step="0.01"
+                                                            v-model.number="target.brokerage" />
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <label>Scenario</label>
+                                                        <select class="form-select" v-model="target.scenario">
+                                                            <option v-for="scen in scenarios" :value="scen.value">{{
+                                                                scen.label }}</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <label>Option Type</label>
+                                                        <select class="form-select" v-model="target.optionType">
+                                                            <option v-for="type in optionTypes" :value="type.value">{{
+                                                                type.label }}</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <label>Transaction Type</label>
+                                                        <select class="form-select" v-model="target.transactionType">
+                                                            <option v-for="tran in transactionTypes"
+                                                                :value="tran.value">{{ tran.label }}</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="col-12 text-end">
+                                                        <button class="btn btn-success btn-sm"
+                                                            @click="recalculate(index)">
+                                                            <i class="bi bi-check-circle"></i> Apply
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <style>
-        .shadow-right-bottom {
-            border-radius: 10px;
-            box-shadow: 4px 4px 5px rgba(0, 0, 0, 0.15);
-        }
-    </style>
     <script>
         const { createApp } = Vue;
 
         createApp({
             data() {
                 return {
+                    optionTypes: [
+                        { value: 'call', label: 'Call Option' },
+                        { value: 'put', label: 'Put Option' }
+                    ],
+                    transactionTypes: [
+                        { value: 'buy_open', label: 'Buy to Open' },
+                        { value: 'sell_close', label: 'Sell to Close' },
+                        { value: 'sell_open', label: 'Sell to Open' },
+                        { value: 'buy_close', label: 'Buy to Close' }
+                    ],
+                    scenarios: [
+                        { value: 'close', label: 'Close Position' },
+                        { value: 'exercise', label: 'Exercise Option' },
+                        { value: 'expire', label: 'Hold to Expiry' }
+                    ],
                     numContracts: 10,
                     premium: 0.63,
                     brokerage: 35,
                     strikePrice: 3.81,
                     optionType: 'call',
+                    transactionType: 'buy_open',
+                    scenario: 'close',
                     newTargetPrice: null,
-                    targetPrices: []
+                    forecastSharePrice: null,
+                    expiryDate: '',
+                    impliedVolatility: '',
+                    targetPrices: [],
+                    originalEditCache: {} // NEW: Track original values for cancel
                 };
             },
-            methods: {
-                
-                addTargetPrice() {
-                    if (this.newTargetPrice !== null && this.newTargetPrice !== '') {
-                        const price = parseFloat(this.newTargetPrice);
-                        const intrinsicValue = this.optionType === 'call' ? Math.max(price - this.strikePrice, 0) : Math.max(this.strikePrice - price, 0);
-                        const totalCost = (this.numContracts * 100 * this.premium) + this.brokerage;
-                        const profit = (intrinsicValue * this.numContracts * 100) - totalCost;
-                        const breakevenPrice = this.optionType === 'call'
-                            ? this.strikePrice + (totalCost / (this.numContracts * 100))
-                            : this.strikePrice - (totalCost / (this.numContracts * 100));
 
-                        this.targetPrices.push({
-                            id: Date.now(),
-                            price,
-                            numContracts: this.numContracts,
-                            premium: this.premium,
-                            brokerage: this.brokerage,
-                            strikePrice: this.strikePrice,
-                            optionType: this.optionType,
-                            intrinsicValue,
-                            totalCost,
-                            profit,
-                            breakevenPrice,
-                            showDetails: false,
-                            isEditing: false
-                        });
-
+            watch: {
+                scenario(newVal) {
+                    if (newVal === 'close') {
+                        this.forecastSharePrice = null;
+                    } else {
                         this.newTargetPrice = null;
                     }
+                }
+            },
+
+            methods: {
+                liveUpdate(index) {
+                    const target = this.targetPrices[index];
+                    const price = target.scenario === 'close' ? target.price : target.forecastSharePrice;
+                    const updated = this.calculateProfitMetrics(
+                        price,
+                        target.premium,
+                        target.brokerage,
+                        target.strikePrice,
+                        target.optionType,
+                        target.transactionType,
+                        target.scenario,
+                        target.numContracts
+                    );
+                    Object.assign(target, updated);
                 },
+                addTargetPrice() {
+                    const forecastPrice = this.scenario === 'close'
+                        ? parseFloat(this.newTargetPrice)
+                        : parseFloat(this.forecastSharePrice);
+
+                    if (isNaN(forecastPrice)) return;
+
+                    const adjustedTransactionType = this.scenario === 'close'
+                        ? this.transactionType
+                        : ['buy_open', 'sell_open'].includes(this.transactionType)
+                            ? this.transactionType
+                            : 'buy_open';
+
+                    const target = {
+                        id: Date.now(),
+                        forecastSharePrice: this.scenario === 'close' ? null : forecastPrice,
+                        price: this.scenario === 'close' ? forecastPrice : null,
+                        numContracts: parseInt(this.numContracts),
+                        premium: this.premium,
+                        brokerage: this.brokerage,
+                        strikePrice: this.strikePrice,
+                        optionType: this.optionType,
+                        transactionType: adjustedTransactionType,
+                        scenario: this.scenario,
+                        expiryDate: this.expiryDate,
+                        impliedVolatility: this.impliedVolatility,
+                        isEditing: false,
+                        showDetails: false,
+                        ...this.calculateProfitMetrics(
+                            forecastPrice,
+                            this.premium,
+                            this.brokerage,
+                            this.strikePrice,
+                            this.optionType,
+                            adjustedTransactionType,
+                            this.scenario,
+                            parseInt(this.numContracts)
+                        )
+                    };
+
+                    this.targetPrices.push(target);
+                    this.newTargetPrice = null;
+                    this.forecastSharePrice = null;
+                },
+                recalculate(index) {
+                    const target = this.targetPrices[index];
+
+                    const forecastPrice = target.scenario === 'close'
+                        ? target.price
+                        : target.forecastSharePrice;
+
+                    const adjustedTransactionType = target.scenario === 'close'
+                        ? target.transactionType
+                        : ['buy_open', 'sell_open'].includes(target.transactionType)
+                            ? target.transactionType
+                            : 'buy_open';
+
+                    const updated = this.calculateProfitMetrics(
+                        forecastPrice,
+                        target.premium,
+                        target.brokerage,
+                        target.strikePrice,
+                        target.optionType,
+                        adjustedTransactionType,
+                        target.scenario,
+                        target.numContracts
+                    );
+
+                    Object.assign(target, updated);
+                    target.transactionType = adjustedTransactionType;
+                    target.isEditing = false;
+                    delete this.originalEditCache[target.id];
+                },
+
+                cancelEdit(index) {
+                    const target = this.targetPrices[index];
+                    const cache = this.originalEditCache[target.id];
+                    if (cache) {
+                        Object.assign(target, cache);
+                    }
+                    target.isEditing = false;
+                    delete this.originalEditCache[target.id];
+                },
+
                 toggleEdit(index) {
-                    this.targetPrices[index].isEditing = !this.targetPrices[index].isEditing;
+                    const target = this.targetPrices[index];
+                    if (!target.isEditing) {
+                        this.originalEditCache[target.id] = JSON.parse(JSON.stringify(target));
+                    }
+                    target.isEditing = !target.isEditing;
                 },
-                removeTarget(index) {
-                    this.targetPrices.splice(index, 1);
-                },
+
                 toggleDetails(index) {
                     this.targetPrices[index].showDetails = !this.targetPrices[index].showDetails;
                 },
-                updateTarget(index) {
-                    const t = this.targetPrices[index];
-                    const intrinsicValue = t.optionType === 'call' ? Math.max(t.price - t.strikePrice, 0) : Math.max(t.strikePrice - t.price, 0);
-                    const totalCost = (t.numContracts * 100 * t.premium) + t.brokerage;
-                    const profit = (intrinsicValue * t.numContracts * 100) - totalCost;
-                    const breakevenPrice = t.optionType === 'call'
-                        ? t.strikePrice + (totalCost / (t.numContracts * 100))
-                        : t.strikePrice - (totalCost / (t.numContracts * 100));
 
-                    this.targetPrices[index] = {
-                        ...t,
+                removeTarget(index) {
+                    this.targetPrices.splice(index, 1);
+                },
+
+                calculateProfitMetrics(price, premium, brokerage, strikePrice, optionType, transactionType, scenario, contracts) {
+                    const multiplier = 100;
+                    let intrinsicValue = 0;
+                    let profit = 0;
+                    let breakeven = 0;
+
+                    if (scenario !== 'close') {
+                        intrinsicValue = optionType === 'call'
+                            ? Math.max(price - strikePrice, 0)
+                            : Math.max(strikePrice - price, 0);
+                    }
+
+                    const totalPremium = premium * contracts * multiplier;
+
+                    if (scenario === 'close') {
+                        const closePremium = price * contracts * multiplier;
+                        if (transactionType === 'buy_open') {
+                            profit = closePremium - totalPremium - brokerage;
+                        } else if (transactionType === 'sell_open') {
+                            profit = totalPremium - closePremium - brokerage;
+                        } else if (transactionType === 'buy_close') {
+                            profit = totalPremium - closePremium - brokerage;
+                        } else if (transactionType === 'sell_close') {
+                            profit = closePremium - totalPremium - brokerage;
+                        }
+                    } else {
+                        const value = intrinsicValue * contracts * multiplier;
+                        if (['buy_open', 'buy_close'].includes(transactionType)) {
+                            profit = value - totalPremium - brokerage;
+                        } else if (['sell_open', 'sell_close'].includes(transactionType)) {
+                            profit = totalPremium - value - brokerage;
+                        }
+
+                        if (scenario === 'expire' && intrinsicValue === 0) {
+                            profit = ['buy_open', 'buy_close'].includes(transactionType)
+                                ? -totalPremium - brokerage
+                                : totalPremium - brokerage;
+                        }
+                    }
+
+                    breakeven = scenario === 'close'
+                        ? premium + (brokerage / (contracts * multiplier))
+                        : optionType === 'call'
+                            ? strikePrice + premium + (brokerage / (contracts * multiplier))
+                            : strikePrice - premium - (brokerage / (contracts * multiplier));
+
+                    return {
                         intrinsicValue,
-                        totalCost,
                         profit,
-                        breakevenPrice
+                        breakeven,
+                        totalCost: totalPremium + brokerage,
+                        totalCredit: totalPremium - brokerage
                     };
                 },
-                preventNonNumeric(event) {
-                    const invalidChars = ['-', '+', 'e', 'E', '.'];
-                    if (invalidChars.includes(event.key)) {
-                        event.preventDefault();
+
+                optionTypeClass(target) {
+                    return {
+                        'call': 'bg-success',
+                        'put': 'bg-danger'
+                    }[target.optionType];
+                },
+
+                scenarioDetails(target) {
+                    const displayPrice = target.scenario === 'close' ? target.price : target.forecastSharePrice;
+                    const details = {
+                        close: `Closed at $${displayPrice}`,
+                        exercise: `Exercised at $${displayPrice}`,
+                        expire: target.intrinsicValue > 0
+                            ? `Expired ITM ($${displayPrice})`
+                            : `Expired OTM ($${displayPrice})`
+                    };
+                    return details[target.scenario];
+                },
+
+                profitFormula(target) {
+                    if (target.scenario === 'close') {
+                        return `Profit = (Close Price - Open Premium) × Contracts × 100 - Fees<br>
+                            = ($${target.price} - $${target.premium.toFixed(2)}) × ${target.numContracts} × 100 - $${target.brokerage.toFixed(2)}`;
+                    } else {
+                        return `Profit = (Intrinsic Value × Contracts × 100) - Net Cost<br>
+                            = ($${target.intrinsicValue.toFixed(2)} × ${target.numContracts} × 100) - $${target.totalCost.toFixed(2)}`;
                     }
                 },
-                validatePremiumInput(event) {
-                    if (event.target.value < 0) {
-                        this.premium = 0;
+
+                expirationStatus(target) {
+                    if (target.scenario === 'expire') {
+                        return target.intrinsicValue > 0
+                            ? "ℹ️ Option automatically exercised at expiration"
+                            : "ℹ️ Option expired worthless";
                     }
+                    return "";
                 },
-                preventNegativeInput(event) {
-                    if (event.key === '-' || event.key === '+') {
-                        event.preventDefault();
-                    }
+
+                sanitizeIntegerInput(path) {
+                    const value = this.getNestedValue(path);
+                    const sanitized = value.toString().replace(/\D/g, '');
+                    this.setNestedValue(path, sanitized ? parseInt(sanitized) : '');
                 },
-                sanitizeIntegerInput(propertyPath) {
-                    const value = this.getPropertyByPath(this, propertyPath);
-                    const sanitizedValue = value.toString().replace(/\D/g, '');
-                    this.setPropertyByPath(this, propertyPath, sanitizedValue ? parseInt(sanitizedValue, 10) : '');
+
+                getNestedValue(path) {
+                    return path.split(/[\[\].]/).reduce((obj, key) => (obj && key !== '' ? obj[key] : obj), this);
                 },
-                getPropertyByPath(obj, path) {
-                    return path.split('.').reduce((o, p) => (o ? o[p] : undefined), obj);
-                },
-                setPropertyByPath(obj, path, value) {
-                    const keys = path.split('.');
+
+                setNestedValue(path, value) {
+                    const keys = path.split(/[\[\].]/).filter(k => k !== '');
                     const lastKey = keys.pop();
-                    const targetObj = keys.reduce((o, p) => (o ? o[p] : undefined), obj);
-                    if (targetObj && lastKey) {
-                        targetObj[lastKey] = value;
-                    }
+                    const parent = keys.reduce((obj, key) => obj[key], this);
+                    parent[lastKey] = value;
+                },
+
+                preventNonNumeric(e) {
+                    if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault();
+                },
+
+                validatePremium(e) {
+                    if (e.target.value < 0) e.target.value = 0;
                 }
             }
         }).mount('#app');
     </script>
+
+
 </body>
 
 </html>
