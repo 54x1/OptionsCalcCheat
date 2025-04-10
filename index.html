@@ -263,9 +263,10 @@
                                             <div class="col-12">
                                                 <div class="d-flex justify-content-end gap-2">
                                                     <button class="btn btn-sm btn-outline-secondary"
-                                                        @click.stop="toggleEdit(index)">
-                                                        <i class="bi bi-pencil"></i> Edit
-                                                    </button>
+                                                    @click.stop="toggleEdit(index)">
+                                                <i class="bi" :class="target.isEditing ? 'bi-x-circle' : 'bi-pencil'"></i>
+                                                {{ target.isEditing ? 'Cancel' : 'Edit' }}
+                                            </button>
                                                     <button class="btn btn-sm btn-outline-danger"
                                                         @click.stop="removeTarget(index)">
                                                         <i class="bi bi-trash"></i> Delete
@@ -510,12 +511,22 @@
                 },
 
                 toggleEdit(index) {
-                    const target = this.targetPrices[index];
-                    if (!target.isEditing) {
-                        this.originalEditCache[target.id] = JSON.parse(JSON.stringify(target));
-                    }
-                    target.isEditing = !target.isEditing;
-                },
+    const target = this.targetPrices[index];
+
+    if (target.isEditing) {
+        // Cancel edit and restore original values
+        const cache = this.originalEditCache[target.id];
+        if (cache) {
+            Object.assign(target, cache);
+        }
+        target.isEditing = false;
+        delete this.originalEditCache[target.id];
+    } else {
+        // Save current state for cancel and enable editing
+        this.originalEditCache[target.id] = JSON.parse(JSON.stringify(target));
+        target.isEditing = true;
+    }
+},
 
                 toggleDetails(index) {
                     this.targetPrices[index].showDetails = !this.targetPrices[index].showDetails;
